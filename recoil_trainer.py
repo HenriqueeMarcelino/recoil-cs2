@@ -18,6 +18,7 @@ import time
 import threading
 import sys
 import platform
+import random
 from pathlib import Path
 from datetime import datetime
 from pynput import mouse
@@ -237,24 +238,24 @@ class RecoilEngine:
             self.pattern = []
 
     def calculate_scale(self):
-        """Calcula scale baseado em DPI e sensibilidade"""
+        """Calcula scale baseado em DPI e sensibilidade (corrigido)"""
         dpi = self.config.get('dpi', 800)
         sens = self.config.get('sensitivity', 1.0)
 
-        # Fórmula de conversão CS2
+        # CORREÇÃO: Usar multiplicador padrão de 6 (sistemas profissionais)
+        # Fórmula: scale = multiplicador / (sensitivity × (dpi / 800))
+        base_multiplier = 6.0  # Padrão para rifles (Artanis-RCS)
         dpi_factor = dpi / 800.0
-        m_yaw = 0.022
 
-        # Scale base empírico ajustado (AUMENTADO de 10.0 para 30.0)
-        scale = 30.0 / (sens * dpi_factor)
+        scale = base_multiplier / (sens * dpi_factor)
 
-        # Aplica multiplier do usuário
-        multiplier = self.config.get('scale_multiplier', 1.0)
+        # Aplica multiplier do usuário para ajuste fino
+        user_multiplier = self.config.get('scale_multiplier', 1.0)
 
-        return scale * multiplier
+        return scale * user_multiplier
 
     def move_mouse(self, dx, dy):
-        """Move mouse usando Windows API"""
+        """Move mouse usando SendInput (Windows API moderna)"""
         if platform.system() != 'Windows':
             return
 
@@ -262,25 +263,46 @@ class RecoilEngine:
         dy = int(dy)
 
         try:
-            ctypes.windll.user32.mouse_event(0x0001, dx, dy, 0, 0)
-        except:
-            pass
+            # Usa SendInput ao invés de mouse_event (mais preciso e moderno)
+            input_obj = INPUT()
+            input_obj.type = INPUT_MOUSE
+            input_obj.mi.dx = dx
+            input_obj.mi.dy = dy
+            input_obj.mi.mouseData = 0
+            input_obj.mi.dwFlags = MOUSEEVENTF_MOVE
+            input_obj.mi.time = 0
+            input_obj.mi.dwExtraInfo = None
+
+            ctypes.windll.user32.SendInput(1, ctypes.byref(input_obj), ctypes.sizeof(INPUT))
+        except Exception as e:
+            # Fallback para mouse_event se SendInput falhar
+            try:
+                ctypes.windll.user32.mouse_event(0x0001, dx, dy, 0, 0)
+            except:
+                pass
 
     def calculate_compensation(self, bullet_index):
-        """Calcula compensação para o tiro atual"""
+        """Calcula compensação para o tiro atual (com jitter)"""
         if bullet_index >= len(self.pattern):
             bullet_index = len(self.pattern) - 1
 
         x, y = self.pattern[bullet_index]
         scale = self.calculate_scale()
 
+        # Calcula movimento base
         dx = -x * scale
         dy = -y * scale
+
+        # CORREÇÃO: Adiciona jitter (variação aleatória) para movimento natural
+        # Jitter de ±3% no movimento (sistemas profissionais usam ±5%)
+        jitter_factor = random.uniform(0.97, 1.03)
+        dx *= jitter_factor
+        dy *= jitter_factor
 
         return (dx, dy)
 
     def compensate_recoil(self):
-        """Thread de compensação"""
+        """Thread de compensação (otimizada)"""
         current_time = time.time()
 
         # Reset de recoil se passou muito tempo desde último tiro
@@ -290,7 +312,11 @@ class RecoilEngine:
 
         last_shot_time = time.time()
         scale = self.calculate_scale()
-        self.log(f"Spray iniciado - Scale: {scale:.4f}")
+        dpi = self.config.get('dpi', 800)
+        sens = self.config.get('sensitivity', 1.0)
+        edpi = dpi * sens
+
+        self.log(f"Spray iniciado - Scale: {scale:.4f} | eDPI: {edpi}")
 
         while self.is_shooting and self.running and self.enabled:
             current_time = time.time()
@@ -300,11 +326,17 @@ class RecoilEngine:
                 self.current_bullet = 0
                 self.log("Recoil resetado (pausa detectada)")
 
-            if current_time - last_shot_time >= self.fire_rate:
+            # CORREÇÃO: Adiciona jitter no timing (±1ms)
+            jitter_timing = random.uniform(-0.001, 0.001)
+            effective_fire_rate = self.fire_rate + jitter_timing
+
+            if current_time - last_shot_time >= effective_fire_rate:
                 dx, dy = self.calculate_compensation(self.current_bullet)
                 self.move_mouse(dx, dy)
 
-                self.log(f"Tiro {self.current_bullet + 1}/{len(self.pattern)}: ({dx:.1f}, {dy:.1f})")
+                # Log mais detalhado
+                if self.current_bullet % 3 == 0:  # Log a cada 3 tiros para não poluir
+                    self.log(f"Tiro {self.current_bullet + 1}: dx={dx:.1f}, dy={dy:.1f}")
 
                 self.current_bullet += 1
                 last_shot_time = current_time
@@ -359,10 +391,10 @@ class RecoilTrainerGUI:
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
-        # Janela principal
+        # Janela principal (otimizada para 1366x768)
         self.root = ctk.CTk()
         self.root.title("CS2 Recoil Trainer")
-        self.root.geometry("850x600")
+        self.root.geometry("1280x680")
         self.root.resizable(True, True)  # Permite redimensionar
 
         # Configurações
@@ -442,52 +474,53 @@ class RecoilTrainerGUI:
         self.engine.on_status_change = self.update_status_indicator
 
     def create_ui(self):
-        """Cria interface completa"""
-        # Header
+        """Cria interface completa com tabs"""
+        # Header compacto
         header = ctk.CTkLabel(
             self.root,
             text="🎯 CS2 Recoil Trainer",
-            font=("Segoe UI", 28, "bold")
+            font=("Segoe UI", 20, "bold")
         )
-        header.pack(pady=15)
+        header.pack(pady=10)
 
-        # Container principal
-        main_container = ctk.CTkFrame(self.root)
-        main_container.pack(fill="both", expand=True, padx=20, pady=10)
+        # Status compacto no topo
+        self.create_status_section(self.root)
 
-        # Coluna esquerda - Configurações + Arma
-        left_frame = ctk.CTkFrame(main_container, width=450)
-        left_frame.pack(side="left", fill="both", expand=False, padx=(0, 10))
-        left_frame.pack_propagate(False)
+        # Sistema de tabs
+        self.tabview = ctk.CTkTabview(self.root)
+        self.tabview.pack(fill="both", expand=True, padx=15, pady=10)
 
-        self.create_weapon_section(left_frame)
-        self.create_config_section(left_frame)
+        # Cria as tabs
+        tab1 = self.tabview.add("⚙️ Configurações")
+        tab2 = self.tabview.add("🔫 Arma & Pattern")
+        tab3 = self.tabview.add("📝 Logs")
 
-        # Coluna direita - Status, Pattern e Logs
-        right_frame = ctk.CTkFrame(main_container)
-        right_frame.pack(side="right", fill="both", expand=True)
+        # Preenche cada tab
+        self.create_config_section(tab1)
+        self.create_weapon_and_pattern_section(tab2)
+        self.create_log_section(tab3)
 
-        self.create_status_section(right_frame)
-        self.create_pattern_section(right_frame)
-        self.create_log_section(right_frame)
-
-        # Footer - Botões de ação
+        # Footer - Botões de ação (SEMPRE VISÍVEIS)
         self.create_action_buttons()
 
-    def create_weapon_section(self, parent):
-        """Seção de seleção de arma com imagem"""
-        weapon_frame = ctk.CTkFrame(parent)
-        weapon_frame.pack(fill="x", padx=10, pady=10)
+    def create_weapon_and_pattern_section(self, parent):
+        """Tab combinada: Arma + Spray Pattern"""
+        # Container com duas colunas
+        container = ctk.CTkFrame(parent, fg_color="transparent")
+        container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        title = ctk.CTkLabel(weapon_frame, text="🔫 Arma", font=("Segoe UI", 16, "bold"))
-        title.pack(pady=5)
+        # Coluna esquerda - Arma
+        left_col = ctk.CTkFrame(container)
+        left_col.pack(side="left", fill="both", expand=True, padx=(0, 5))
+
+        title_weapon = ctk.CTkLabel(left_col, text="🔫 Arma Selecionada", font=("Segoe UI", 14, "bold"))
+        title_weapon.pack(pady=10)
 
         # Tenta carregar imagem real, senão usa placeholder
         weapon_img_path = Path("ak47.png")
         if weapon_img_path.exists():
             try:
                 weapon_img = Image.open(weapon_img_path)
-                # Redimensiona mantendo proporção
                 weapon_img.thumbnail((200, 100), Image.Resampling.LANCZOS)
             except:
                 weapon_img = create_weapon_image("AK-47")
@@ -495,47 +528,37 @@ class RecoilTrainerGUI:
             weapon_img = create_weapon_image("AK-47")
 
         self.weapon_photo = ctk.CTkImage(light_image=weapon_img, dark_image=weapon_img, size=(200, 100))
-
-        self.weapon_img_label = ctk.CTkLabel(weapon_frame, image=self.weapon_photo, text="")
+        self.weapon_img_label = ctk.CTkLabel(left_col, image=self.weapon_photo, text="")
         self.weapon_img_label.pack(pady=10)
 
-        # Nome da arma (fixo por enquanto)
-        weapon_name = ctk.CTkLabel(weapon_frame, text="AK-47", font=("Segoe UI", 18, "bold"))
+        weapon_name = ctk.CTkLabel(left_col, text="AK-47", font=("Segoe UI", 16, "bold"))
         weapon_name.pack(pady=5)
 
-        info = ctk.CTkLabel(weapon_frame, text="Apenas AK-47 disponível no momento",
+        info = ctk.CTkLabel(left_col, text="Padrão de 30 tiros\n600 RPM (~0.1s entre tiros)",
                            font=("Segoe UI", 10), text_color="gray")
-        info.pack(pady=2)
+        info.pack(pady=5)
 
-    def create_pattern_section(self, parent):
-        """Seção do spray pattern visual"""
-        pattern_frame = ctk.CTkFrame(parent)
-        pattern_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        # Coluna direita - Pattern
+        right_col = ctk.CTkFrame(container)
+        right_col.pack(side="right", fill="both", expand=True, padx=(5, 0))
 
-        title = ctk.CTkLabel(pattern_frame, text="📈 Spray Pattern", font=("Segoe UI", 14, "bold"))
-        title.pack(pady=5)
+        title_pattern = ctk.CTkLabel(right_col, text="📈 Spray Pattern", font=("Segoe UI", 14, "bold"))
+        title_pattern.pack(pady=10)
 
-        # Gera imagem do pattern
         if self.engine and self.engine.pattern:
-            pattern_img = create_spray_pattern_image(self.engine.pattern)
+            pattern_img = create_spray_pattern_image(self.engine.pattern, size=(250, 320))
             self.pattern_photo = ctk.CTkImage(light_image=pattern_img, dark_image=pattern_img,
-                                             size=(280, 350))
-
-            self.pattern_img_label = ctk.CTkLabel(pattern_frame, image=self.pattern_photo, text="")
+                                             size=(250, 320))
+            self.pattern_img_label = ctk.CTkLabel(right_col, image=self.pattern_photo, text="")
             self.pattern_img_label.pack(pady=5)
         else:
-            no_pattern = ctk.CTkLabel(pattern_frame, text="Nenhum padrão carregado",
-                                     text_color="gray")
+            no_pattern = ctk.CTkLabel(right_col, text="Nenhum padrão carregado", text_color="gray")
             no_pattern.pack(pady=20)
 
     def create_config_section(self, parent):
-        """Seção de configurações"""
-        config_frame = ctk.CTkFrame(parent)
+        """Seção de configurações - Tab dedicada"""
+        config_frame = ctk.CTkFrame(parent, fg_color="transparent")
         config_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # Título
-        title = ctk.CTkLabel(config_frame, text="⚙️ Configurações", font=("Segoe UI", 16, "bold"))
-        title.pack(pady=10)
 
         # DPI
         dpi_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
@@ -622,68 +645,65 @@ class RecoilTrainerGUI:
         )
         btn_plus.pack(side="left", padx=2)
 
-        # eDPI calculado
-        edpi_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
-        edpi_frame.pack(fill="x", padx=10, pady=5)
-
-        ctk.CTkLabel(edpi_frame, text="eDPI:", font=("Segoe UI", 12, "bold")).pack(side="left", padx=5)
-        self.edpi_label = ctk.CTkLabel(edpi_frame, text="800", font=("Segoe UI", 12))
-        self.edpi_label.pack(side="right", padx=5)
-
     def create_status_section(self, parent):
-        """Seção de status"""
-        status_frame = ctk.CTkFrame(parent)
-        status_frame.pack(fill="x", padx=10, pady=10)
+        """Banner de status compacto"""
+        status_frame = ctk.CTkFrame(parent, height=40)
+        status_frame.pack(fill="x", padx=20, pady=5)
 
-        ctk.CTkLabel(status_frame, text="📊 Status", font=("Segoe UI", 14, "bold")).pack(pady=5)
-
-        # Indicador de status
+        # Layout horizontal
+        # Status à esquerda
         self.status_indicator = ctk.CTkLabel(
             status_frame,
             text="● DESATIVADO",
-            font=("Segoe UI", 18, "bold"),
+            font=("Segoe UI", 14, "bold"),
             text_color="red"
         )
-        self.status_indicator.pack(pady=5)
+        self.status_indicator.pack(side="left", padx=15, pady=5)
 
-        # Scale atual
+        # eDPI no centro
+        self.edpi_label = ctk.CTkLabel(
+            status_frame,
+            text="eDPI: 800",
+            font=("Segoe UI", 12)
+        )
+        self.edpi_label.pack(side="left", padx=15, pady=5)
+
+        # Scale à direita
         self.scale_label = ctk.CTkLabel(
             status_frame,
             text="Scale: 0.0000",
             font=("Segoe UI", 12)
         )
-        self.scale_label.pack(pady=2)
+        self.scale_label.pack(side="right", padx=15, pady=5)
 
     def create_log_section(self, parent):
-        """Seção de logs"""
-        log_frame = ctk.CTkFrame(parent)
+        """Seção de logs - Tab dedicada"""
+        log_frame = ctk.CTkFrame(parent, fg_color="transparent")
         log_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        ctk.CTkLabel(log_frame, text="📝 Logs", font=("Segoe UI", 14, "bold")).pack(pady=5)
-
-        # Área de texto com scroll
+        # Área de texto com scroll (maior na tab)
         self.log_text = scrolledtext.ScrolledText(
             log_frame,
-            width=35,
-            height=8,
+            width=80,
+            height=20,
             bg="#2b2b2b",
             fg="#ffffff",
-            font=("Consolas", 9),
+            font=("Consolas", 10),
             state='disabled'
         )
         self.log_text.pack(fill="both", expand=True, padx=5, pady=5)
 
     def create_action_buttons(self):
-        """Botões de ação"""
+        """Botões de ação - sempre visíveis no rodapé"""
         button_frame = ctk.CTkFrame(self.root)
-        button_frame.pack(fill="x", padx=20, pady=15)
+        button_frame.pack(fill="x", padx=20, pady=10)
 
         # Botão Start/Stop
         self.toggle_btn = ctk.CTkButton(
             button_frame,
             text="▶ INICIAR",
             font=("Segoe UI", 16, "bold"),
-            height=50,
+            height=45,
             fg_color="green",
             hover_color="darkgreen",
             command=self.toggle_compensator
@@ -693,9 +713,9 @@ class RecoilTrainerGUI:
         # Botão Salvar
         save_btn = ctk.CTkButton(
             button_frame,
-            text="💾 SALVAR CONFIGURAÇÕES",
+            text="💾 SALVAR",
             font=("Segoe UI", 14, "bold"),
-            height=50,
+            height=45,
             fg_color="#1f6aa5",
             hover_color="#144870",
             command=self.save_config
