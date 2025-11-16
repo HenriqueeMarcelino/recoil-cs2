@@ -220,11 +220,26 @@ pip install --upgrade customtkinter pynput pillow
 3. **NÃO use em servidores VAC**
 4. **Apenas para treino offline**
 
+## 🖼️ Imagens Personalizadas
+
+Você pode substituir as imagens de armas por versões personalizadas:
+
+1. **Baixe uma imagem PNG da AK-47** (transparente, recomendado)
+2. **Salve como `ak47.png`** na pasta do projeto
+3. **Execute o programa** - ele usará sua imagem automaticamente
+
+**Onde encontrar imagens:**
+- [PNGFind - CS:GO AK-47](https://www.pngfind.com/mpng/wwhox_csgo-ak-png-ak-47-cs-go-png/)
+- [PNGitem - CS:GO Weapons](https://www.pngitem.com/so/csgo-ak47/)
+- [PNGWing - Counter-Strike Weapons](https://www.pngwing.com/en/free-png-iiytd)
+
+Se não adicionar nenhuma imagem, o programa usa um **desenho estilizado** automático.
+
 ## 🎯 Próximos Passos (Futuro)
 
-- [ ] Adicionar imagens das armas
+- [x] ~~Adicionar imagens das armas~~ (Suporta imagens customizáveis)
+- [x] ~~Gráfico visual do spray pattern~~ (Implementado)
 - [ ] Suporte para M4A4, M4A1-S
-- [ ] Gráfico visual do spray pattern
 - [ ] Modo de análise pós-treino
 - [ ] Exportar estatísticas
 - [ ] Temas personalizáveis

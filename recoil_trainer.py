@@ -54,29 +54,62 @@ if platform.system() == 'Windows':
 
 
 def create_weapon_image(weapon_name, size=(200, 100)):
-    """Cria imagem placeholder da arma"""
-    img = Image.new('RGBA', size, (30, 30, 30, 255))
+    """Cria imagem estilizada da arma AK-47"""
+    img = Image.new('RGBA', size, (25, 25, 35, 255))
     draw = ImageDraw.Draw(img)
 
-    # Desenha retângulo com borda
-    draw.rectangle([10, 10, size[0]-10, size[1]-10],
-                   outline=(100, 100, 100), width=2)
+    if weapon_name == "AK-47":
+        # Cores
+        weapon_color = (80, 70, 60)  # Marrom escuro (madeira)
+        metal_color = (120, 120, 130)  # Metal
+        highlight = (150, 140, 120)
 
-    # Texto centralizado
+        # Corpo principal (receiver)
+        draw.rectangle([40, 35, 170, 55], fill=metal_color, outline=(90, 90, 95), width=2)
+
+        # Cano
+        draw.rectangle([120, 42, 180, 48], fill=metal_color, outline=(70, 70, 75), width=1)
+
+        # Coronha (stock) - madeira
+        draw.polygon([(35, 38), (55, 38), (55, 52), (35, 52)], fill=weapon_color, outline=(60, 50, 40))
+
+        # Grip (empunhadura) - madeira
+        draw.polygon([(75, 55), (85, 55), (90, 70), (70, 70)], fill=weapon_color, outline=(60, 50, 40))
+
+        # Carregador (magazine)
+        draw.rectangle([80, 60, 95, 85], fill=(60, 55, 50), outline=(40, 35, 30), width=1)
+        draw.rectangle([82, 62, 93, 83], fill=(50, 45, 40))
+
+        # Guarda-mão (handguard) - madeira
+        draw.rectangle([100, 40, 140, 56], fill=weapon_color, outline=(60, 50, 40), width=1)
+
+        # Detalhes metálicos
+        draw.line([130, 43, 175, 43], fill=(90, 90, 95), width=1)
+        draw.line([130, 47, 175, 47], fill=(90, 90, 95), width=1)
+
+        # Mira frontal
+        draw.rectangle([175, 38, 178, 42], fill=(150, 150, 160))
+
+        # Highlights
+        draw.line([42, 37, 168, 37], fill=highlight, width=1)
+
+    # Nome da arma
     try:
-        font = ImageFont.truetype("arial.ttf", 20)
+        font = ImageFont.truetype("arial.ttf", 16)
     except:
         font = ImageFont.load_default()
 
     text = weapon_name
     bbox = draw.textbbox((0, 0), text, font=font)
     text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
 
     x = (size[0] - text_width) / 2
-    y = (size[1] - text_height) / 2
+    y = 8
 
-    draw.text((x, y), text, fill=(255, 255, 255), font=font)
+    # Sombra do texto
+    draw.text((x+1, y+1), text, fill=(0, 0, 0, 180), font=font)
+    # Texto principal
+    draw.text((x, y), text, fill=(255, 200, 100), font=font)
 
     return img
 
@@ -449,8 +482,18 @@ class RecoilTrainerGUI:
         title = ctk.CTkLabel(weapon_frame, text="🔫 Arma", font=("Segoe UI", 16, "bold"))
         title.pack(pady=5)
 
-        # Imagem da arma
-        weapon_img = create_weapon_image("AK-47")
+        # Tenta carregar imagem real, senão usa placeholder
+        weapon_img_path = Path("ak47.png")
+        if weapon_img_path.exists():
+            try:
+                weapon_img = Image.open(weapon_img_path)
+                # Redimensiona mantendo proporção
+                weapon_img.thumbnail((200, 100), Image.Resampling.LANCZOS)
+            except:
+                weapon_img = create_weapon_image("AK-47")
+        else:
+            weapon_img = create_weapon_image("AK-47")
+
         self.weapon_photo = ctk.CTkImage(light_image=weapon_img, dark_image=weapon_img, size=(200, 100))
 
         self.weapon_img_label = ctk.CTkLabel(weapon_frame, image=self.weapon_photo, text="")
