@@ -125,24 +125,39 @@ pip install -r requirements.txt
 
 ### Execução
 
-1. Execute o script:
+#### Para usar DENTRO do CS2 (RECOMENDADO):
+
+1. **Execute como Administrador**:
+   - Clique com botão direito no PowerShell/CMD
+   - Escolha "Executar como Administrador"
+
+2. Execute o script v2:
+```bash
+cd C:\PJ\recoil-cs2
+python recoil_compensator_v2.py
+```
+
+3. Configure suas opções:
+   - Escolha sua resolução de jogo
+   - Digite sua sensibilidade no CS2
+
+4. Entre no CS2 (modo offline ou servidor de treino)
+
+5. Selecione a AK-47
+
+6. Segure o botão esquerdo do mouse para disparar
+   - O script detectará automaticamente
+   - Compensação será aplicada em tempo real
+
+7. Pressione `Ctrl+C` para sair
+
+#### Para testes fora do jogo:
+
 ```bash
 python recoil_compensator.py
 ```
 
-2. Configure suas opções:
-   - Escolha sua resolução de jogo
-   - Digite sua sensibilidade no CS2
-
-3. Entre no CS2 (modo offline ou servidor de treino)
-
-4. Selecione a AK-47
-
-5. Segure o botão esquerdo do mouse para disparar
-   - O script detectará automaticamente
-   - Compensação será aplicada em tempo real
-
-6. Pressione `Ctrl+C` para sair
+Use esta versão para testar no desktop/bloco de notas.
 
 ### Exemplo de Uso
 
@@ -229,14 +244,33 @@ Ajuste o `scale_factor` no código:
 - Aumente para compensação mais forte (ex: `0.2`)
 - Diminua para compensação mais fraca (ex: `0.1`)
 
+### Mouse não move DENTRO do CS2 (mas funciona fora)
+
+**Problema**: Script funciona no menu/desktop, mas não dentro do jogo.
+
+**Causa**: CS2 usa **Raw Input** - captura o mouse diretamente do hardware, ignorando cursor do Windows.
+
+**Solução**: Use a **versão v2** que usa Windows API:
+
+```bash
+python recoil_compensator_v2.py
+```
+
+**Diferenças entre versões**:
+- **v1 (`recoil_compensator.py`)**: Funciona fora de jogos (testes, desktop)
+- **v2 (`recoil_compensator_v2.py`)**: Usa Windows SendInput API - funciona DENTRO do CS2
+
+**IMPORTANTE**: Execute v2 como **Administrador** para funcionar no jogo!
+
 ## 📁 Estrutura do Projeto
 
 ```
 recoil-cs2/
-├── ak47_pattern.csv          # Dados do padrão de spray (30 pontos)
-├── recoil_compensator.py     # Script principal
-├── requirements.txt          # Dependências Python
-└── README.md                 # Este arquivo
+├── ak47_pattern.csv              # Dados do padrão de spray (30 pontos)
+├── recoil_compensator.py         # v1 - Para testes fora do jogo
+├── recoil_compensator_v2.py      # v2 - GAME MODE (Windows API)
+├── requirements.txt              # Dependências Python
+└── README.md                     # Este arquivo
 ```
 
 ## 🔍 Análise Técnica
