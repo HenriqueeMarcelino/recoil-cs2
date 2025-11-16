@@ -156,6 +156,11 @@ class RecoilEngine:
         self.weapon = weapon
         self.config = config or {}
         self.pattern = []
+
+        # Callbacks para GUI (ANTES de load_weapon_pattern)
+        self.on_log = None
+        self.on_status_change = None
+
         self.load_weapon_pattern(weapon)
 
         self.is_shooting = False
@@ -169,10 +174,6 @@ class RecoilEngine:
             'AK-47': 0.1  # ~600 RPM
         }
         self.fire_rate = self.fire_rates.get(weapon, 0.1)
-
-        # Callbacks para GUI
-        self.on_log = None
-        self.on_status_change = None
 
     def load_weapon_pattern(self, weapon):
         """Carrega padrão de spray baseado na arma"""
