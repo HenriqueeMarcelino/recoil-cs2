@@ -238,28 +238,27 @@ class RecoilEngine:
             self.pattern = []
 
     def calculate_scale(self):
-        """Calcula scale normalizado por eDPI (CORRIGIDO V2)"""
-        dpi = self.config.get('dpi', 800)
+        """Calcula scale com FÓRMULA MATEMÁTICA EXATA - CS2 Raw Input"""
         sens = self.config.get('sensitivity', 1.0)
 
-        # eDPI calculation
-        edpi_user = dpi * sens
-        edpi_reference = 800  # Referência para calibração (eDPI baixo/médio)
+        # Constante CS2 (m_yaw)
+        m_yaw = 0.022
 
-        # Multiplicador base (calibrado empiricamente para rifles)
-        base_multiplier = 6.0
+        # FÓRMULA EXATA: mouse_counts = degrees / (sensitivity × m_yaw)
+        # CSV contém valores em GRAUS
+        # SendInput usa mouse counts (mickeys), não pixels
+        #
+        # Derivação:
+        # - Recoil no jogo: X graus
+        # - Movimento necessário: X / (sens × m_yaw) counts
+        # - Exemplo: 26° com sens 1.25 = 26 / 0.0275 = 945 counts
+        #
+        # Portanto, scale = 1 / (sens × m_yaw)
 
-        # Normaliza inversamente pelo eDPI
-        # Quanto MAIOR o eDPI, MENOR o scale
-        edpi_ratio = edpi_reference / edpi_user
+        scale = 1.0 / (sens * m_yaw)
 
-        # Scale final: base × ratio eDPI
-        # Para eDPI 800: scale = 6.0 × 1.0 = 6.0
-        # Para eDPI 2000: scale = 6.0 × 0.4 = 2.4
-        # Para eDPI 4000: scale = 6.0 × 0.2 = 1.2
-        scale = base_multiplier * edpi_ratio
-
-        # User adjustment para calibração fina
+        # User adjustment OPCIONAL (deveria ser ~1.0 sempre)
+        # Mantido apenas para ajuste fino se necessário
         user_multiplier = self.config.get('scale_multiplier', 1.0)
 
         return scale * user_multiplier
