@@ -238,18 +238,26 @@ class RecoilEngine:
             self.pattern = []
 
     def calculate_scale(self):
-        """Calcula scale baseado em DPI e sensibilidade (corrigido)"""
+        """Calcula scale normalizado por eDPI (CORRIGIDO)"""
         dpi = self.config.get('dpi', 800)
         sens = self.config.get('sensitivity', 1.0)
 
-        # CORREÇÃO: Usar multiplicador padrão de 6 (sistemas profissionais)
-        # Fórmula: scale = multiplicador / (sensitivity × (dpi / 800))
-        base_multiplier = 6.0  # Padrão para rifles (Artanis-RCS)
-        dpi_factor = dpi / 800.0
+        # eDPI calculation
+        edpi_user = dpi * sens
+        edpi_reference = 880  # Média pro players CS2
 
-        scale = base_multiplier / (sens * dpi_factor)
+        # Normaliza pelo eDPI (quanto maior o eDPI, menor o scale)
+        edpi_factor = edpi_reference / edpi_user
 
-        # Aplica multiplier do usuário para ajuste fino
+        # Constante CS2
+        m_yaw = 0.022
+
+        # FÓRMULA CORRETA: escala inversamente com eDPI
+        # Para eDPI 4000: scale = 0.22 / 0.0275 = 8.0
+        # Para eDPI 880: scale = 1.0 / 0.0275 = 36.4
+        scale = edpi_factor / (sens * m_yaw)
+
+        # User adjustment para calibração fina
         user_multiplier = self.config.get('scale_multiplier', 1.0)
 
         return scale * user_multiplier
@@ -316,6 +324,9 @@ class RecoilEngine:
         sens = self.config.get('sensitivity', 1.0)
         edpi = dpi * sens
 
+        # Aviso sobre eDPI extremo
+        if edpi > 2000:
+            self.log(f"⚠️ eDPI {edpi} é MUITO alto! (Pro: ~880)")
         self.log(f"Spray iniciado - Scale: {scale:.4f} | eDPI: {edpi}")
 
         while self.is_shooting and self.running and self.enabled:
@@ -644,6 +655,20 @@ class RecoilTrainerGUI:
             command=self.increase_scale
         )
         btn_plus.pack(side="left", padx=2)
+
+        # Aviso sobre eDPI
+        edpi_info_frame = ctk.CTkFrame(config_frame, fg_color="#2b2b2b")
+        edpi_info_frame.pack(fill="x", padx=10, pady=15)
+
+        ctk.CTkLabel(edpi_info_frame, text="💡 Informação Importante",
+                    font=("Segoe UI", 12, "bold")).pack(pady=5)
+
+        info_text = ("Pro players CS2 usam eDPI ~880\n"
+                    "eDPI alto (>2000) requer multiplicador BAIXO (0.5-1.5)\n"
+                    "Comece com multiplier 1.0 e ajuste aos poucos")
+
+        ctk.CTkLabel(edpi_info_frame, text=info_text,
+                    font=("Segoe UI", 9), text_color="gray", justify="left").pack(pady=5)
 
     def create_status_section(self, parent):
         """Banner de status compacto"""
