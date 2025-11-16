@@ -238,27 +238,26 @@ class RecoilEngine:
             self.pattern = []
 
     def calculate_scale(self):
-        """Calcula scale com FÓRMULA MATEMÁTICA EXATA - CS2 Raw Input"""
+        """Calcula scale usando FÓRMULA PROFISSIONAL (Artanis-RCS)"""
         sens = self.config.get('sensitivity', 1.0)
 
-        # Constante CS2 (m_yaw)
-        m_yaw = 0.022
-
-        # FÓRMULA EXATA: mouse_counts = degrees / (sensitivity × m_yaw)
-        # CSV contém valores em GRAUS
-        # SendInput usa mouse counts (mickeys), não pixels
+        # FÓRMULA BASEADA EM ARTANIS-RCS (sistema profissional)
+        # Fonte: https://github.com/ArtanisInc/Artanis-RCS
+        # Arquivo: data/config_repository.py linha 62
         #
-        # Derivação:
-        # - Recoil no jogo: X graus
-        # - Movimento necessário: X / (sens × m_yaw) counts
-        # - Exemplo: 26° com sens 1.25 = 26 / 0.0275 = 945 counts
+        # SENSITIVITY_MULTIPLIER = 2.45 (constante empírica testada)
+        # scale = CSV_VALUE × 2.45 / game_sensitivity
         #
-        # Portanto, scale = 1 / (sens × m_yaw)
+        # Exemplo para sens 1.25:
+        # scale = 2.45 / 1.25 = 1.96
+        #
+        # Tiro 3 (CSV: y = -26):
+        # dy = -26 × 1.96 = -50.96 mouse counts
 
-        scale = 1.0 / (sens * m_yaw)
+        SENSITIVITY_MULTIPLIER = 2.45
+        scale = SENSITIVITY_MULTIPLIER / sens
 
-        # User adjustment OPCIONAL (deveria ser ~1.0 sempre)
-        # Mantido apenas para ajuste fino se necessário
+        # User adjustment (calibração fina se necessário)
         user_multiplier = self.config.get('scale_multiplier', 1.0)
 
         return scale * user_multiplier
