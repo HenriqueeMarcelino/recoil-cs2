@@ -181,6 +181,54 @@ Instruções:
 Aguardando cliques...
 ```
 
+## 🔧 Troubleshooting
+
+### Erro: `TypeError: '_thread._ThreadHandle' object is not callable`
+
+**Problema**: Se você está usando Python 3.13, pode encontrar este erro ao executar o script.
+
+**Causa**: Incompatibilidade entre `pynput 1.7.6` e Python 3.13.
+
+**Solução**:
+
+**Opção 1: Atualizar pynput (RECOMENDADO)**
+```bash
+pip install --upgrade pynput
+```
+
+**Opção 2: Reinstalar com versão correta**
+```bash
+pip uninstall pynput
+pip install pynput>=1.8.1
+```
+
+**Opção 3: Usar Python 3.11 ou 3.12**
+Se as opções acima não funcionarem, use uma versão anterior do Python:
+```bash
+# Instalar Python 3.12
+# Então criar ambiente virtual
+python3.12 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# ou
+venv\Scripts\activate  # Windows
+
+pip install -r requirements.txt
+```
+
+### Script não detecta cliques
+
+1. Execute como **Administrador** (Windows) ou com `sudo` (Linux)
+2. Verifique se não há outro software bloqueando input do mouse
+3. Tente desabilitar antivírus temporariamente
+
+### Compensação muito forte ou fraca
+
+Ajuste o `scale_factor` no código:
+- No arquivo `recoil_compensator.py` linha ~57
+- Valor padrão: `0.15`
+- Aumente para compensação mais forte (ex: `0.2`)
+- Diminua para compensação mais fraca (ex: `0.1`)
+
 ## 📁 Estrutura do Projeto
 
 ```
