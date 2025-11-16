@@ -20,9 +20,8 @@ import sys
 import platform
 from pathlib import Path
 from datetime import datetime
-from pynput import mouse, keyboard
+from pynput import mouse
 from pynput.mouse import Button
-from pynput.keyboard import Key
 
 # Importa Windows API se estiver no Windows
 if platform.system() == 'Windows':
@@ -169,6 +168,10 @@ class RecoilEngine:
         self.shoot_thread = None
         self.running = True
 
+        # Reset de recoil (CS2 reseta após ~0.4s sem atirar)
+        self.last_shot_time = 0
+        self.recoil_reset_time = 0.4  # segundos
+
         # Fire rates por arma (RPM)
         self.fire_rates = {
             'AK-47': 0.1  # ~600 RPM
@@ -209,8 +212,8 @@ class RecoilEngine:
         dpi_factor = dpi / 800.0
         m_yaw = 0.022
 
-        # Scale base empírico ajustado
-        scale = 10.0 / (sens * dpi_factor)
+        # Scale base empírico ajustado (AUMENTADO de 10.0 para 30.0)
+        scale = 30.0 / (sens * dpi_factor)
 
         # Aplica multiplier do usuário
         multiplier = self.config.get('scale_multiplier', 1.0)
@@ -245,14 +248,24 @@ class RecoilEngine:
 
     def compensate_recoil(self):
         """Thread de compensação"""
-        self.current_bullet = 0
-        last_shot_time = time.time()
+        current_time = time.time()
 
+        # Reset de recoil se passou muito tempo desde último tiro
+        if current_time - self.last_shot_time > self.recoil_reset_time:
+            self.current_bullet = 0
+            self.log("Recoil resetado")
+
+        last_shot_time = time.time()
         scale = self.calculate_scale()
         self.log(f"Spray iniciado - Scale: {scale:.4f}")
 
         while self.is_shooting and self.running and self.enabled:
             current_time = time.time()
+
+            # Verifica se deve resetar (parou de atirar por >0.4s)
+            if current_time - last_shot_time > self.recoil_reset_time:
+                self.current_bullet = 0
+                self.log("Recoil resetado (pausa detectada)")
 
             if current_time - last_shot_time >= self.fire_rate:
                 dx, dy = self.calculate_compensation(self.current_bullet)
@@ -262,6 +275,7 @@ class RecoilEngine:
 
                 self.current_bullet += 1
                 last_shot_time = current_time
+                self.last_shot_time = current_time  # Atualiza tempo do último tiro
 
                 if self.current_bullet >= len(self.pattern):
                     self.current_bullet = len(self.pattern) - 1
@@ -315,8 +329,8 @@ class RecoilTrainerGUI:
         # Janela principal
         self.root = ctk.CTk()
         self.root.title("CS2 Recoil Trainer")
-        self.root.geometry("1000x750")
-        self.root.resizable(False, False)
+        self.root.geometry("850x600")
+        self.root.resizable(True, True)  # Permite redimensionar
 
         # Configurações
         self.config_file = Path("config.json")
@@ -326,9 +340,8 @@ class RecoilTrainerGUI:
         self.engine = None
         self.setup_engine()
 
-        # Listeners de input
+        # Listener de mouse
         self.mouse_listener = None
-        self.keyboard_listener = None
 
         # Criar interface
         self.create_ui()
@@ -531,15 +544,40 @@ class RecoilTrainerGUI:
         )
         auto_detect_btn.pack(side="left", padx=5)
 
-        # Scale Multiplier
+        # Scale Multiplier com botões +/-
         scale_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
         scale_frame.pack(fill="x", padx=10, pady=5)
 
         ctk.CTkLabel(scale_frame, text="Scale Multiplier:", font=("Segoe UI", 12)).pack(side="left", padx=5)
+
+        scale_controls = ctk.CTkFrame(scale_frame, fg_color="transparent")
+        scale_controls.pack(side="right", padx=5)
+
+        # Botão -
+        btn_minus = ctk.CTkButton(
+            scale_controls,
+            text="-",
+            width=30,
+            height=25,
+            command=self.decrease_scale
+        )
+        btn_minus.pack(side="left", padx=2)
+
+        # Entry
         self.scale_var = tk.StringVar(value=str(self.config.get('scale_multiplier', 1.0)))
         self.scale_var.trace('w', self.on_config_change)
-        scale_entry = ctk.CTkEntry(scale_frame, textvariable=self.scale_var, width=100)
-        scale_entry.pack(side="right", padx=5)
+        scale_entry = ctk.CTkEntry(scale_controls, textvariable=self.scale_var, width=70)
+        scale_entry.pack(side="left", padx=2)
+
+        # Botão +
+        btn_plus = ctk.CTkButton(
+            scale_controls,
+            text="+",
+            width=30,
+            height=25,
+            command=self.increase_scale
+        )
+        btn_plus.pack(side="left", padx=2)
 
         # eDPI calculado
         edpi_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
@@ -548,15 +586,6 @@ class RecoilTrainerGUI:
         ctk.CTkLabel(edpi_frame, text="eDPI:", font=("Segoe UI", 12, "bold")).pack(side="left", padx=5)
         self.edpi_label = ctk.CTkLabel(edpi_frame, text="800", font=("Segoe UI", 12))
         self.edpi_label.pack(side="right", padx=5)
-
-        # Hotkeys info
-        hotkey_frame = ctk.CTkFrame(config_frame)
-        hotkey_frame.pack(fill="x", padx=10, pady=10)
-
-        ctk.CTkLabel(hotkey_frame, text="⌨️ Atalhos:", font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=5, pady=2)
-        ctk.CTkLabel(hotkey_frame, text="F1: Liga/Desliga", font=("Segoe UI", 10)).pack(anchor="w", padx=5)
-        ctk.CTkLabel(hotkey_frame, text="F2: Aumenta Scale (+10%)", font=("Segoe UI", 10)).pack(anchor="w", padx=5)
-        ctk.CTkLabel(hotkey_frame, text="F3: Diminui Scale (-10%)", font=("Segoe UI", 10)).pack(anchor="w", padx=5)
 
     def create_status_section(self, parent):
         """Seção de status"""
@@ -696,19 +725,15 @@ class RecoilTrainerGUI:
         self.log_text.configure(state='disabled')
 
     def start_listeners(self):
-        """Inicia listeners de mouse e teclado"""
+        """Inicia listener de mouse"""
         try:
             # Mouse listener
             self.mouse_listener = mouse.Listener(on_click=self.on_mouse_click)
             self.mouse_listener.start()
 
-            # Keyboard listener
-            self.keyboard_listener = keyboard.Listener(on_press=self.on_key_press)
-            self.keyboard_listener.start()
-
-            self.log("✓ Listeners iniciados")
+            self.log("✓ Listener de mouse iniciado")
         except Exception as e:
-            self.log(f"✗ Erro ao iniciar listeners: {e}")
+            self.log(f"✗ Erro ao iniciar listener: {e}")
 
     def on_mouse_click(self, x, y, button, pressed):
         """Handler de clique do mouse"""
@@ -718,32 +743,23 @@ class RecoilTrainerGUI:
             else:
                 self.engine.stop_spray()
 
-    def on_key_press(self, key):
-        """Handler de teclas"""
+    def increase_scale(self):
+        """Aumenta scale em 10%"""
         try:
-            # F1: Toggle
-            if key == Key.f1:
-                self.toggle_compensator()
+            current = float(self.scale_var.get())
+            new_scale = current * 1.1
+            self.scale_var.set(f"{new_scale:.2f}")
+            self.log(f"⬆️ Scale aumentado: {new_scale:.2f}")
+        except:
+            pass
 
-            # F2: Aumentar scale
-            elif key == Key.f2:
-                try:
-                    current = float(self.scale_var.get())
-                    new_scale = current * 1.1
-                    self.scale_var.set(f"{new_scale:.2f}")
-                    self.log(f"⬆️ Scale aumentado: {new_scale:.2f}")
-                except:
-                    pass
-
-            # F3: Diminuir scale
-            elif key == Key.f3:
-                try:
-                    current = float(self.scale_var.get())
-                    new_scale = current * 0.9
-                    self.scale_var.set(f"{new_scale:.2f}")
-                    self.log(f"⬇️ Scale diminuído: {new_scale:.2f}")
-                except:
-                    pass
+    def decrease_scale(self):
+        """Diminui scale em 10%"""
+        try:
+            current = float(self.scale_var.get())
+            new_scale = current * 0.9
+            self.scale_var.set(f"{new_scale:.2f}")
+            self.log(f"⬇️ Scale diminuído: {new_scale:.2f}")
         except:
             pass
 
@@ -757,9 +773,6 @@ class RecoilTrainerGUI:
 
         if self.mouse_listener:
             self.mouse_listener.stop()
-
-        if self.keyboard_listener:
-            self.keyboard_listener.stop()
 
         self.root.destroy()
 
