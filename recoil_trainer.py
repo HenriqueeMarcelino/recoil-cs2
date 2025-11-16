@@ -370,9 +370,9 @@ class RecoilTrainerGUI:
                 with open(self.config_file, 'r') as f:
                     loaded = json.load(f)
                     default_config.update(loaded)
-                    self.log(f"✓ Configurações carregadas de {self.config_file}")
+                    print(f"✓ Configurações carregadas de {self.config_file}")
             except Exception as e:
-                self.log(f"⚠️ Erro ao carregar config: {e}")
+                print(f"⚠️ Erro ao carregar config: {e}")
 
         return default_config
 
@@ -780,6 +780,13 @@ class RecoilTrainerGUI:
         """Inicia aplicação"""
         self.log("=== CS2 Recoil Trainer Iniciado ===")
         self.log("⚠️ Use apenas para fins educacionais!")
+
+        # Informa se config foi carregado
+        if self.config_file.exists():
+            self.log(f"✓ Configurações carregadas de {self.config_file.name}")
+        else:
+            self.log("ℹ️ Usando configurações padrão")
+
         self.log("")
         self.recalculate_scale()
         self.root.mainloop()
