@@ -238,24 +238,26 @@ class RecoilEngine:
             self.pattern = []
 
     def calculate_scale(self):
-        """Calcula scale normalizado por eDPI (CORRIGIDO)"""
+        """Calcula scale normalizado por eDPI (CORRIGIDO V2)"""
         dpi = self.config.get('dpi', 800)
         sens = self.config.get('sensitivity', 1.0)
 
         # eDPI calculation
         edpi_user = dpi * sens
-        edpi_reference = 880  # Média pro players CS2
+        edpi_reference = 800  # Referência para calibração (eDPI baixo/médio)
 
-        # Normaliza pelo eDPI (quanto maior o eDPI, menor o scale)
-        edpi_factor = edpi_reference / edpi_user
+        # Multiplicador base (calibrado empiricamente para rifles)
+        base_multiplier = 6.0
 
-        # Constante CS2
-        m_yaw = 0.022
+        # Normaliza inversamente pelo eDPI
+        # Quanto MAIOR o eDPI, MENOR o scale
+        edpi_ratio = edpi_reference / edpi_user
 
-        # FÓRMULA CORRETA: escala inversamente com eDPI
-        # Para eDPI 4000: scale = 0.22 / 0.0275 = 8.0
-        # Para eDPI 880: scale = 1.0 / 0.0275 = 36.4
-        scale = edpi_factor / (sens * m_yaw)
+        # Scale final: base × ratio eDPI
+        # Para eDPI 800: scale = 6.0 × 1.0 = 6.0
+        # Para eDPI 2000: scale = 6.0 × 0.4 = 2.4
+        # Para eDPI 4000: scale = 6.0 × 0.2 = 1.2
+        scale = base_multiplier * edpi_ratio
 
         # User adjustment para calibração fina
         user_multiplier = self.config.get('scale_multiplier', 1.0)
